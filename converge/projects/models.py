@@ -18,6 +18,8 @@ class Project(models.Model):
 		Profile, null=True, blank=True, on_delete=models.SET_NULL, related_name="projects"
 	)
 	metadata = models.JSONField(default=dict, blank=True)
+	semantic_text = models.TextField(blank=True)
+	embedding = models.JSONField(default=list, blank=True)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 

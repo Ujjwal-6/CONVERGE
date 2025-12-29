@@ -9,6 +9,8 @@ class Resume(models.Model):
 	file = models.FileField(upload_to="resumes/")
 	raw_text = models.TextField(blank=True)
 	parsed_json = models.JSONField(default=dict, blank=True)
+	semantic_text = models.TextField(blank=True)
+	embedding = models.JSONField(default=list, blank=True)
 	uploaded_at = models.DateTimeField(auto_now_add=True)
 
 	def __str__(self):
