@@ -1,4 +1,4 @@
-package sasvar.example.chatbot;
+package sasvar.example.chatbot.Database;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

@@ -5,7 +5,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import sasvar.example.chatbot.JsonData;
+import sasvar.example.chatbot.Database.JsonData;
+import sasvar.example.chatbot.Exception.ProfileNotFoundException;
 import sasvar.example.chatbot.Repository.JsonDataRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -46,7 +47,7 @@ Rules:
 - Return ONLY valid minified JSON.
 - Do NOT include explanations, markdown, or extra text.
 
-SON Schema:
+JSON Schema:
 {
   "profile": {
     "user_id": "",
@@ -197,6 +198,33 @@ Resume Text:
 
     public JsonData getById(Long id) {
         return jsonDataRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Profile not found"));
+                .orElseThrow(() -> new ProfileNotFoundException(id));
     }
+
+    public void sendjsontodjango(Long id){
+        JsonData data = getById(id);
+        String resumejson=data.getProfileJson(); //from table getting the json
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<String> request =
+                    new HttpEntity<>(resumejson, headers);
+
+            // 3️⃣ Send to Django ML service
+            RestTemplate restTemplate = new RestTemplate();
+
+            ResponseEntity<String> response =
+                    restTemplate.postForEntity(
+                            "http://localhost:8000/api/process-resume/",
+                            request,
+                            String.class
+                    );
+        }catch (Exception e){
+        // 4️⃣ Log Django response (for now)
+        System.out.println("ML Service not running");
+        }
+
+    }
+
 }

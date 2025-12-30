@@ -4,7 +4,7 @@ import org.springframework.web.bind.annotation.*;
 import sasvar.example.chatbot.Service.ChatBotService;
 import sasvar.example.chatbot.DTO.ChatbotRequestDTO;
 import sasvar.example.chatbot.DTO.ChatbotResponseDTO;
-import sasvar.example.chatbot.JsonData;
+import sasvar.example.chatbot.Database.JsonData;
 
 @RestController
 @RequestMapping("/api")
