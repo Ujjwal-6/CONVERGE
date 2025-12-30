@@ -2,7 +2,7 @@ import os
 import json
 import re
 import time
-import google.generativeai as genai
+from google import genai
 
 # ---------------- CONFIG ---------------- #
 
@@ -19,7 +19,8 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 if not API_KEY:
     raise EnvironmentError("❌ GEMINI_API_KEY not set in environment")
 
-genai.configure(api_key=API_KEY)
+# New google-genai client
+CLIENT = genai.Client(api_key=API_KEY)
 
 # ---------------- SCHEMA ---------------- #
 
@@ -154,21 +155,20 @@ def extract_json(text: str) -> dict:
 # ---------------- PARSER ---------------- #
 
 def parse_resume(resume_text: str) -> dict:
-    model = genai.GenerativeModel(MODEL_NAME)
-
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            response = model.generate_content(
-                build_prompt(resume_text),
-                generation_config={
+            response = CLIENT.models.generate_content(
+                model=MODEL_NAME,
+                contents=build_prompt(resume_text),
+                config={
                     "temperature": 0,
                     "top_p": 1,
                     "top_k": 1,
-                    "max_output_tokens": 2048
-                }
+                    "max_output_tokens": 2048,
+                },
             )
 
-            parsed_json = extract_json(response.text)
+            parsed_json = extract_json(getattr(response, "text", ""))
             return parsed_json
 
         except Exception as e:

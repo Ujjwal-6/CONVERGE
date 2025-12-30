@@ -20,6 +20,7 @@ from django.contrib import admin
 from django.urls import path, include
 from profiles import views as profile_views
 from resumes import views as resume_views
+from projects import views as project_views
 from converge import views as core_views
 
 urlpatterns = [
@@ -31,6 +32,8 @@ urlpatterns = [
     path("", core_views.home, name="home"),
     path("profiles/register/", profile_views.register, name="profiles-register"),
     path("resumes/upload/", resume_views.upload_resume, name="resumes-upload"),
+    path("projects/create/", project_views.create_project, name="projects-create"),
+    path("projects/<int:project_id>/matches/", project_views.project_matches, name="projects-matches"),
     path("discover/", include("discovery.urls")),
 ]
 

@@ -39,6 +39,26 @@ def register(request):
             "external_oss_contributions": request.POST.get("external_oss_contributions", ""),
         }
         try:
+            # Build profile_json from form data
+            import json
+            profile_json = {
+                "profile": {
+                    "name": data["name"],
+                    "registration_number": data["registration_number"],
+                    "department": data["department"],
+                    "course": data["course"],
+                    "year": data["year"],
+                    "availability": "medium"
+                },
+                "collaboration_preferences": {
+                    "roles_preferred": [r.strip() for r in data["preferred_roles"].split(",") if r.strip()],
+                    "project_types": ["hackathon", "research", "startup", "open_source"],
+                },
+                "experience_level": {
+                    "overall": data["experience_level"] or "beginner"
+                }
+            }
+            data["profile_json"] = profile_json
             Profile.objects.create(**data)
             messages.success(request, "Registration successful!")
             # Redirect to the non-API HTML route

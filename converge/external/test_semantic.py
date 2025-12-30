@@ -1,5 +1,5 @@
 import json
-from semantic import build_semantic_text
+from external.semantic import build_semantic_text
 
 # Load resume JSON
 with open("resume_json.json", "r") as f:

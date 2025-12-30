@@ -1,8 +1,8 @@
 import os
 import json
-from create_project import create_project_json, input_project_interactively
-from semantic_project import build_semantic_text_project
-from embed_project import embed_semantic_text_project
+from external.create_project import create_project_json, input_project_interactively
+from external.semantic_project import build_semantic_text_project
+from external.embed_project import embed_semantic_text_project
 
 # -------- CONFIG --------
 PROJECT_EMBEDDINGS_FILE = "project_embeddings.json"

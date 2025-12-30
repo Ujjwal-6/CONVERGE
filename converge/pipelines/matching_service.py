@@ -28,14 +28,17 @@ def match_users_for_project(project_id: int, top_n: int = 5) -> List[Dict]:
     proj_json = project.metadata or {}
 
     results = []
+    print(f"[matching_service] Project embedding dim={len(proj_emb)}")
 
     # Consider all resumes that have embeddings
     for resume in Resume.objects.select_related("profile").all():
         if not resume.embedding:
+            print(f"[matching_service] Resume {resume.profile.registration_number} has no embedding, skipping")
             continue
 
         # Phase 1: semantic gate
         passes, sem_score = semantic_gate(proj_emb, resume.embedding)
+        print(f"[matching_service] {resume.profile.registration_number}: semantic_score={sem_score:.4f}, passes_gate={passes}")
         if not passes:
             continue
 

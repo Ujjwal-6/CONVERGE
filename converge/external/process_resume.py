@@ -1,10 +1,10 @@
 import os
 import json
 import sys
-from ocr1 import extract_text_from_pdf
-from parse_resume import parse_resume
-from semantic import build_semantic_text
-from embed_resume import embed_semantic_text
+from external.ocr1 import extract_text_from_pdf
+from external.parse_resume import parse_resume
+from external.semantic import build_semantic_text
+from external.embed_resume import embed_semantic_text
 
 # -------- CONFIG --------
 USER_EMBEDDINGS_FILE = "user_embeddings.json"

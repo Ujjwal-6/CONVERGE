@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Matches - Converge</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .header {
+            background-color: #007bff;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .project-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 30px;
+        }
+
+        .project-info h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .project-info p {
+            margin: 8px 0;
+            color: #666;
+        }
+
+        .matches-section h2 {
+            color: #333;
+            margin-top: 30px;
+        }
+
+        .match-card {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            background-color: #fafafa;
+        }
+
+        .match-card h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+
+        .match-card .score {
+            font-size: 18px;
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        .match-card .breakdown {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 13px;
+        }
+
+        .breakdown-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-right: 5px;
+            color: #495057;
+        }
+
+        .empty {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+        }
+
+        .error {
+            color: #dc3545;
+            padding: 15px;
+            background-color: #f8d7da;
+            border-radius: 6px;
+        }
+
+        .rank {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>Project Matches</h1>
+        <p>Top candidates for your project</p>
+    </div>
+
+    <div class="container">
+        <a href="/" class="back-link">← Back to Home</a>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% else %}
+        <div class="project-info">
+            <h2>{{ project.title }}</h2>
+            <p>{{ project.description }}</p>
+            {% if project.metadata %}
+            <p>
+                {% if project.metadata.required_skills %}
+                <span class="badge">Skills: {{ project.metadata.required_skills|join:", " }}</span>
+                {% endif %}
+                {% if project.metadata.project_type %}
+                <span class="badge">Type: {{ project.metadata.project_type }}</span>
+                {% endif %}
+                {% if project.metadata.team_size %}
+                <span class="badge">Team: {{ project.metadata.team_size }}</span>
+                {% endif %}
+            </p>
+            {% endif %}
+        </div>
+
+        <div class="matches-section">
+            {% if matches %}
+            <h2>Top {{ matches|length }} Matches</h2>
+            {% for match in matches %}
+            <div class="match-card">
+                <span class="rank">#{forloop.counter}</span>
+                <h3>{{ match.name }}</h3>
+                <p>
+                    <span class="score">Score: {{ match.final_score }}</span>
+                    <span class="badge">User ID: {{ match.user_id }}</span>
+                </p>
+
+                <div class="breakdown">
+                    <div class="breakdown-item">
+                        <span>Semantic Similarity:</span>
+                        <strong>{{ match.semantic_score }}</strong>
+                    </div>
+                    <div class="breakdown-item">
+                        <span>Skill Match:</span>
+                        <strong>{{ match.skill_score }}</strong>
+                    </div>
+                    <div class="breakdown-item">
+                        <span>Experience Alignment:</span>
+                        <strong>{{ match.experience_score }}</strong>
+                    </div>
+                    <div class="breakdown-item">
+                        <span>Year Compatibility:</span>
+                        <strong>{{ match.year_score }}</strong>
+                    </div>
+                    <div class="breakdown-item">
+                        <span>Reputation:</span>
+                        <strong>{{ match.reputation_score }}</strong>
+                    </div>
+                    <div class="breakdown-item">
+                        <span>Availability:</span>
+                        <strong>{{ match.availability_score }}</strong>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty">
+                <p>No matches found. Ensure resumes have been processed with embeddings.</p>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</body>
+
+</html>

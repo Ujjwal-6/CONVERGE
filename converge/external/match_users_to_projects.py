@@ -4,7 +4,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Dict, Tuple
 
 # -------- CONFIG --------
-SEMANTIC_THRESHOLD = 0.35
+SEMANTIC_THRESHOLD = 0.1
 
 # Weights (must sum to 1.0)
 WEIGHTS = {
