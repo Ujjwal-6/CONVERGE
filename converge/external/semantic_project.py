@@ -58,21 +58,4 @@ def build_semantic_text_project(project_json: dict) -> str:
 if __name__ == "__main__":
     import json
     
-    # Example project
-    example_project = {
-        "project_id": "proj_001",
-        "title": "Secure ML-based Intrusion Detection System",
-        "description": "Building a real-time intrusion detection system using ML for network security.",
-        "required_skills": ["Machine Learning", "Cybersecurity", "Python"],
-        "preferred_technologies": ["Scikit-Learn", "TensorFlow", "Linux"],
-        "domains": ["Security", "Machine Learning"],
-        "project_type": "hackathon",
-        "team_size": 4,
-        "created_at": "2025-01-01T00:00:00"
-    }
-    
-    semantic_text = build_semantic_text_project(example_project)
-    
-    print("\n====== SEMANTIC TEXT ======\n")
-    print(semantic_text)
-    print("\n===========================\n")
+

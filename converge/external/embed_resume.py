@@ -1,22 +1,31 @@
-import hashlib
-import numpy as np
+import google.generativeai as genai
 from external.semantic import build_semantic_text
+
+# Configure Google Generative AI
+EMBEDDING_MODEL = "models/text-embedding-004"
+api_key = "AIzaSyBGsPwYotiRqZfQaAodEXrt7KP1xOqutR4"  # Testing only
+genai.configure(api_key=api_key)
 
 # ---------------- EMBEDDING FUNCTION ----------------
 def embed_semantic_text(text: str) -> list:
     """
-    Converts semantic text into a deterministic 256-dim embedding vector.
-    Uses SHA-256 hash of text to seed RNG for reproducibility.
+    Converts semantic text into a 768-dim embedding vector using Google's embedding model.
     """
-    # Deterministic local embedding: hash text -> RNG seed -> normalized vector
-    h = hashlib.sha256((text or "").encode("utf-8")).digest()
-    seed = int.from_bytes(h[:8], byteorder="big", signed=False)
-    rng = np.random.default_rng(seed)
-    vec = rng.normal(0, 1, 768).astype(np.float32)
-    norm = float(np.linalg.norm(vec)) or 1.0
-    embedding = (vec / norm).tolist()
-    print(f"[embed_resume] Generated deterministic embedding (dim={len(embedding)})")
-    return embedding
+    if not text:
+        return [0.0] * 768
+    
+    try:
+        result = genai.embed_content(
+            model=EMBEDDING_MODEL,
+            content=text,
+            task_type="RETRIEVAL_DOCUMENT"
+        )
+        embedding = result['embedding']
+        print(f"[embed_resume] Generated Google embedding (dim={len(embedding)})")
+        return embedding
+    except Exception as e:
+        print(f"[embed_resume] ❌ Error generating embedding: {str(e)}")
+        raise
 
 # ---------------- RUNNER ----------------
 if __name__ == "__main__":

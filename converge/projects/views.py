@@ -163,6 +163,7 @@ def match_project(request, project_id):
 		
 		# Phase 1: Semantic relevance filter
 		phase1_passes = []
+		semantic_candidates = []  # keep all with their scores for fallback if gate is too strict
 		
 		for idx, resume_emb in enumerate(ResumeEmbedding.objects.all(), 1):
 			if not resume_emb.embedding:
@@ -178,6 +179,13 @@ def match_project(request, project_id):
 			)
 			
 			print(f"[{idx}/{total_resumes}] resume_id={resume_emb.resume_id}: semantic={sem_score:.4f} ({interpretation}), passes={passes}")
+			semantic_candidates.append({
+				"resume_id": resume_emb.resume_id,
+				"embedding": resume_emb.embedding,
+				"semantic_score": sem_score,
+				"interpretation": interpretation,
+				"passed": passes,
+			})
 			
 			if not passes:
 				continue
@@ -190,6 +198,20 @@ def match_project(request, project_id):
 			})
 		
 		print(f"[matching] Phase 1: {passed_gate}/{resumes_with_embeddings} passed semantic filter")
+
+		# Fallback: if no one passed the semantic gate, take the top-N by semantic score to continue scoring
+		if not phase1_passes and semantic_candidates:
+			semantic_candidates.sort(key=lambda c: c["semantic_score"], reverse=True)
+			top_semantic = semantic_candidates[:top_n]
+			phase1_passes = [
+				{
+					"resume_id": c["resume_id"],
+					"embedding": c["embedding"],
+					"semantic_score": c["semantic_score"],
+				}
+				for c in top_semantic
+			]
+			print(f"[matching] Fallback: semantic gate strict; proceeding with top {len(phase1_passes)} by semantic score")
 		
 		#we have two phases to compute scores
 		#first one is based on the embeddings, gives semantic score
