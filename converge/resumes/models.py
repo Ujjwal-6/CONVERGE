@@ -1,17 +1,22 @@
 from django.db import models
 
-from profiles.models import Profile
 
-#Here we have to return the output of Gemini!!!!!!!!!!!!!!!!!!!!!
-#!!!!!!!!!!!!!!!!!!!!!!!
-class Resume(models.Model):
-	profile = models.OneToOneField(Profile, on_delete=models.CASCADE, related_name="resume")
-	file = models.FileField(upload_to="resumes/")
-	raw_text = models.TextField(blank=True)
-	parsed_json = models.JSONField(default=dict, blank=True)
-	semantic_text = models.TextField(blank=True)
-	embedding = models.JSONField(default=list, blank=True)
-	uploaded_at = models.DateTimeField(auto_now_add=True)
+class ResumeEmbedding(models.Model):
+	"""
+	Stores embeddings for resumes parsed by Spring Boot backend.
+	Django generates semantic_text + embedding from parsed JSON.
+	"""
+	resume_id = models.IntegerField(unique=True, db_index=True, help_text="Foreign key to Spring Boot resume table")
+	semantic_text = models.TextField(blank=True, help_text="Reduced semantic representation")
+	embedding = models.JSONField(default=list, help_text="768-dim embedding vector")
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		db_table = "resume_embeddings"
+		indexes = [
+			models.Index(fields=['resume_id']),
+		]
 
 	def __str__(self):
-		return f"Resume for {self.profile.registration_number}"
+		return f"ResumeEmbedding(resume_id={self.resume_id})"

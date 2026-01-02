@@ -1,15 +1,9 @@
 from django.contrib import admin
 
-from .models import Project
+from .models import ProjectEmbedding
 
 
-@admin.register(Project)
-class ProjectAdmin(admin.ModelAdmin):
-	list_display = ("title", "project_type", "owner_profile", "created_at")
-	list_filter = ("project_type",)
-	search_fields = (
-		"title",
-		"description",
-		"github_url",
-		"owner_profile__registration_number",
-	)
+@admin.register(ProjectEmbedding)
+class ProjectEmbeddingAdmin(admin.ModelAdmin):
+	list_display = ("project_id", "created_at", "updated_at")
+	search_fields = ("project_id",)

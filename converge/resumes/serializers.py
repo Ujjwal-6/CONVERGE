@@ -1,9 +1,17 @@
 from rest_framework import serializers
-from .models import Resume
+from .models import ResumeEmbedding
 
 
-class ResumeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Resume
-        fields = ["id", "profile", "file", "raw_text", "parsed_json", "uploaded_at"]
-        read_only_fields = ["id", "raw_text", "parsed_json", "uploaded_at"]
+class ResumeEmbeddingInputSerializer(serializers.Serializer):
+	"""Input for embedding generation"""
+	resume_id = serializers.IntegerField(required=True)
+	parsed_json = serializers.JSONField(required=True)
+
+
+class ResumeEmbeddingSerializer(serializers.ModelSerializer):
+	"""Output with embedding data"""
+	class Meta:
+		model = ResumeEmbedding
+		fields = ['resume_id', 'semantic_text', 'embedding', 'created_at', 'updated_at']
+		read_only_fields = ['created_at', 'updated_at']
+

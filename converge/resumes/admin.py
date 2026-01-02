@@ -1,9 +1,9 @@
 from django.contrib import admin
 
-from .models import Resume
+from .models import ResumeEmbedding
 
 
-@admin.register(Resume)
-class ResumeAdmin(admin.ModelAdmin):
-	list_display = ("profile", "uploaded_at")
-	search_fields = ("profile__registration_number",)
+@admin.register(ResumeEmbedding)
+class ResumeEmbeddingAdmin(admin.ModelAdmin):
+	list_display = ("resume_id", "created_at", "updated_at")
+	search_fields = ("resume_id",)

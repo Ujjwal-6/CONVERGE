@@ -1,13 +1,10 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 from . import views
 
 app_name = "projects"
-router = DefaultRouter()
-router.register(r"", views.ProjectViewSet, basename="project")
 
 urlpatterns = [
-    path("create/", views.create_project, name="create"),
-    path("<int:project_id>/matches/", views.project_matches, name="matches"),
-    path("", include(router.urls)),
+	path("embed/", views.generate_project_embedding, name="generate-embedding"),
+	path("match/<int:project_id>/", views.match_project, name="match"),
 ]
+

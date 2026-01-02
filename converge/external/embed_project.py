@@ -1,14 +1,5 @@
-import os
-from google import genai
 import hashlib
 import numpy as np
-
-# -------- CONFIG --------
-EMBEDDING_MODEL = "models/text-embedding-004"
-FALLBACK_MODELS = ["models/text-embedding-004", "models/embedding-001"]
-
-# New google-genai client
-CLIENT = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # -------- EMBEDDING FUNCTION --------
 def embed_semantic_text_project(text: str) -> list:

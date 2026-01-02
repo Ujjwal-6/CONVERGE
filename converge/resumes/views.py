@@ -1,47 +1,68 @@
-from django.shortcuts import render
-from django.contrib import messages
-from rest_framework import viewsets
-from .models import Resume
-from .serializers import ResumeSerializer
-from profiles.models import Profile
-from pipelines.resume_pipeline import process_resume_instance
+from rest_framework import status
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from .models import ResumeEmbedding
+from .serializers import ResumeEmbeddingInputSerializer, ResumeEmbeddingSerializer
+from external.semantic import build_semantic_text
+from external.embed_resume import embed_semantic_text
 
 
-class ResumeViewSet(viewsets.ModelViewSet):
-    queryset = Resume.objects.all()
-    serializer_class = ResumeSerializer
+@api_view(['POST'])
+def generate_resume_embedding(request):
+	"""
+	Generate semantic text and embedding from parsed resume JSON.
+	
+	POST /api/embed/resume/
+	Body: {
+		"resume_id": 123,
+		"parsed_json": { ... parsed resume data from Spring Boot ... }
+	}
+	
+	Returns: {
+		"resume_id": 123,
+		"semantic_text": "...",
+		"embedding": [768 floats],
+		"created_at": "...",
+		"updated_at": "..."
+	}
+	"""
+	input_serializer = ResumeEmbeddingInputSerializer(data=request.data)
+	
+	if not input_serializer.is_valid():
+		return Response(input_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+	
+	resume_id = input_serializer.validated_data['resume_id']
+	parsed_json = input_serializer.validated_data['parsed_json']
+	
+	try:
+		# Generate semantic text
+		semantic_text = build_semantic_text(parsed_json)
+		
+		# Generate embedding
+		embedding = embed_semantic_text(semantic_text)
+		
+		# Store or update
+		resume_embedding, created = ResumeEmbedding.objects.update_or_create(
+			resume_id=resume_id,
+			defaults={
+				'semantic_text': semantic_text,
+				'embedding': embedding
+			}
+		)
+		#No need to retuern, only store
+		output_serializer = ResumeEmbeddingSerializer(resume_embedding)
+		return Response(
+			{
+				"message": "Embedding generated successfully",
+				"data": output_serializer.data
+			},
+			status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+		)
+		
+	except Exception as e:
+		return Response(
+			{"error": f"Embedding generation failed: {str(e)}"},
+			status=status.HTTP_500_INTERNAL_SERVER_ERROR
+		)
 
-#Getting the resume upload form and handling the post request
-def upload_resume(request):
-    if request.method == "POST":
-        reg = request.POST.get("registration_number")
-        f = request.FILES.get("file") #Only the file path
-        try:
-            profile = Profile.objects.get(registration_number=reg)
-        except Profile.DoesNotExist:
-            messages.error(request, "Profile not found. Please register first.")
-            return render(request, "upload_resume.html")
-
-        if not f:
-            messages.error(request, "Please select a PDF file.")
-            return render(request, "upload_resume.html")
-
-        resume_obj, _created = Resume.objects.update_or_create(
-            profile=profile,
-            defaults={"file": f},
-        )
-
-        # Run processing pipeline (OCR → parse → semantic → embed)
-        try:
-            summary = process_resume_instance(resume_obj)
-            if summary:
-                messages.success(
-                    request,
-                    f"Resume processed (chars: {summary['text_len']}, dim: {summary['embedding_dim']})."
-                )
-            else:
-                messages.error(request, "Uploaded, but processing failed. Check terminal logs for details.")
-        except Exception as e:
-            messages.error(request, f"Pipeline error: {str(e)}")
-    return render(request, "upload_resume.html")
 
