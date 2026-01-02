@@ -1,12 +1,19 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .models import ProjectEmbedding
-from .serializers import ProjectEmbeddingInputSerializer, ProjectEmbeddingSerializer
-from resumes.models import ResumeEmbedding
+from .models import ProjectEmbedding, ProjectJSON
+from .serializers import ProjectEmbeddingInputSerializer, ProjectEmbeddingSerializer, ProjectJSONSerializer
+from resumes.models import ResumeEmbedding, ResumeJSON
 from external.semantic_project import build_semantic_text_project
 from external.embed_project import embed_semantic_text_project
-from external.match_users_to_projects import semantic_gate, score_skill_match, score_experience_alignment, score_year_compatibility, score_reputation, score_availability, compute_final_score
+from external.match_users_to_projects import (
+	semantic_relevance_filter,
+	compute_capability_score,
+	compute_trust_score,
+	compute_final_score,
+	PROJECT_TYPE_ALPHA
+)
+from ratings.services import get_global_rating_data
 
 
 @api_view(['POST'])
@@ -37,6 +44,12 @@ def generate_project_embedding(request):
 	parsed_json = input_serializer.validated_data['parsed_json']
 	
 	try:
+		# Store project JSON for later matching (avoid requiring it in match request)
+		project_json_record, _ = ProjectJSON.objects.update_or_create(
+			project_id=project_id,
+			defaults={"project_json": parsed_json}
+		)
+
 		# Generate semantic text
 		semantic_text = build_semantic_text_project(parsed_json)
 		
@@ -53,10 +66,12 @@ def generate_project_embedding(request):
 		)
 		
 		output_serializer = ProjectEmbeddingSerializer(project_embedding)
+		project_json_serializer = ProjectJSONSerializer(project_json_record)
 		return Response(
 			{
-				"message": "Embedding generated successfully",
-				"data": output_serializer.data
+				"message": "Project JSON stored and embedding generated successfully",
+				"data": output_serializer.data,
+				"project_json": project_json_serializer.data
 			},
 			status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
 		)
@@ -71,9 +86,9 @@ def generate_project_embedding(request):
 @api_view(['POST'])
 def match_project(request, project_id):
 	"""
-	Find top-N matching resumes for a project.
+	Find top-N matching resumes for a project using two-layer scoring.
 	
-	POST /api/match/{project_id}/?top=5
+	POST /api/project/match/{project_id}/?top=5
 	
 	Returns: {
 		"project_id": 456,
@@ -81,9 +96,22 @@ def match_project(request, project_id):
 			{
 				"resume_id": 123,
 				"final_score": 0.85,
-				"semantic_score": 0.72,
-				"skill_score": 0.90,
-				...
+				"layer1_capability": {
+					"capability_score": 0.82,
+					"s_semantic": 0.75,
+					"s_skills": 0.90,
+					"s_experience": 1.0
+				},
+				"layer2_trust": {
+					"trust_score": 0.88,
+					"s_rating": 0.85,
+					"s_reliability": 0.91,
+					"completion_ratio": 0.95
+				},
+				"scoring_formula": {
+					"alpha": 0.65,
+					"formula": "..."
+				}
 			},
 			...
 		],
@@ -106,10 +134,22 @@ def match_project(request, project_id):
 				status=status.HTTP_400_BAD_REQUEST
 			)
 		
-		# You need to fetch the full project JSON from Spring Boot's DB
-		# For now, we'll use metadata if available
-		# TODO: Query Spring Boot's project table via shared DB
-		proj_json = {}  # Placeholder - fetch from Spring Boot table
+		# Load stored project JSON; allow request body override if provided
+		stored_project_json = None
+		try:
+			stored_project_json = ProjectJSON.objects.get(project_id=project_id).project_json
+		except ProjectJSON.DoesNotExist:
+			stored_project_json = None
+		proj_json = request.data.get('project_json') or stored_project_json or {}
+
+		if not proj_json:
+			return Response(
+				{"error": "project JSON not found; provide project_json or store it first"},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		project_type = proj_json.get("project_type", "hackathon")
+		required_skills = proj_json.get("required_skills", [])
 		
 		results = []
 		total_resumes = ResumeEmbedding.objects.count()
@@ -117,10 +157,13 @@ def match_project(request, project_id):
 		passed_gate = 0
 		
 		print(f"\n{'='*60}")
-		print(f"[matching] Starting match for project_id={project_id}, top_n={top_n}")
+		print(f"[matching] Two-layer matching for project_id={project_id}")
+		print(f"[matching] Project type: {project_type}, Skills: {required_skills}")
 		print(f"{'='*60}")
 		
-		# Consider all resume embeddings
+		# Phase 1: Semantic relevance filter
+		phase1_passes = []
+		
 		for idx, resume_emb in enumerate(ResumeEmbedding.objects.all(), 1):
 			if not resume_emb.embedding:
 				print(f"[{idx}/{total_resumes}] resume_id={resume_emb.resume_id}: ❌ No embedding")
@@ -128,63 +171,107 @@ def match_project(request, project_id):
 			
 			resumes_with_embeddings += 1
 			
-			# Phase 1: semantic gate->vector similarity
-			passes, sem_score = semantic_gate(proj_emb, resume_emb.embedding)
+			# Apply semantic filter
+			passes, sem_score, interpretation = semantic_relevance_filter(
+				proj_emb, 
+				resume_emb.embedding
+			)
 			
-			print(f"[{idx}/{total_resumes}] resume_id={resume_emb.resume_id}: semantic={sem_score:.4f}, passes={passes}")
+			print(f"[{idx}/{total_resumes}] resume_id={resume_emb.resume_id}: semantic={sem_score:.4f} ({interpretation}), passes={passes}")
 			
 			if not passes:
 				continue
 			
 			passed_gate += 1
+			phase1_passes.append({
+				'resume_id': resume_emb.resume_id,
+				'embedding': resume_emb.embedding,
+				'semantic_score': sem_score
+			})
+		
+		print(f"[matching] Phase 1: {passed_gate}/{resumes_with_embeddings} passed semantic filter")
+		
+		#we have two phases to compute scores
+		#first one is based on the embeddings, gives semantic score
+
+		#second one has two layers capability and alignment, trust and execution
+		#-----------------------------------------------------------------------
+		
+		# Phase 2: Two-layer scoring
+		# Fetch stored resume JSONs for candidates we will score
+		resume_ids = [candidate['resume_id'] for candidate in phase1_passes]
+		stored_resume_jsons = {
+			record.resume_id: record.resume_json or {}
+			for record in ResumeJSON.objects.filter(resume_id__in=resume_ids)
+		}
+		# Fallback to request payload if provided (for backward compatibility/tests)
+		fallback_resume_jsons = request.data.get('resume_jsons', {})
+
+		#phase1_passes contains resumes that passed the semantic filter
+
+		for candidate in phase1_passes:
+			resume_id = candidate['resume_id']
 			
-			# Phase 2: composite scoring
-			# TODO: Fetch resume parsed_json from Spring Boot's resume table
-			user_json = {}  # Placeholder
+			# Get resume JSON from local store, fallback to provided body
+			user_json = stored_resume_jsons.get(resume_id) or fallback_resume_jsons.get(str(resume_id), {}) or {}
+			
+			# Extract data
 			profile = user_json.get("profile", {})
 			skills = user_json.get("skills", {})
 			experience = user_json.get("experience_level", {})
 			reputation = user_json.get("reputation_signals", {})
 			
-			required_skills = proj_json.get("required_skills", [])
-			project_type = proj_json.get("project_type", "hackathon")
-			
-			skill_score = score_skill_match(required_skills, skills)
-			experience_score = score_experience_alignment(
+			# Layer 1: Capability and Alignment
+			capability_data = compute_capability_score(
+				proj_emb,
+				candidate['embedding'],
 				project_type,
-				experience.get("overall", "beginner"),
-				experience.get("by_domain", {})
-			)
-			year_score = score_year_compatibility(profile.get("year", ""))
-			reputation_score = score_reputation(
-				reputation.get("average_rating", 0),
-				reputation.get("completed_projects", 0)
-			)
-			availability_score = score_availability(profile.get("availability", "medium"))
-			
-			final_score = compute_final_score(
-				sem_score,
-				skill_score,
-				experience_score,
-				year_score,
-				reputation_score,
-				availability_score,
+				required_skills,
+				skills,
+				experience.get("overall", "beginner")
 			)
 			
-			print(f"    └─ Final: {final_score:.4f}")
+			# Layer 2: Trust and Execution
+			try:
+				global_rating_data = get_global_rating_data(resume_id)
+				global_rating = global_rating_data.get("global_rating", reputation.get("average_rating", 3.5))
+			except Exception:
+				# If ratings service unavailable, fall back to neutral or provided reputation
+				global_rating = reputation.get("average_rating", 3.5)
+			completed_projects = reputation.get("completed_projects", 0)
+			dropped_projects = 0  # TODO: from project history
+			availability = profile.get("availability", "medium")
+			
+			trust_data = compute_trust_score(
+				global_rating,
+				completed_projects,
+				dropped_projects,
+				availability
+			)
+			
+			# Final score
+			final_score_data = compute_final_score(
+				capability_data["capability_score"],
+				trust_data["trust_score"],
+				project_type
+			)
+			
+			print(f"    └─ resume_id={resume_id}: Final={final_score_data['final_score']:.4f} (C={capability_data['capability_score']:.4f}, T={trust_data['trust_score']:.4f})")
 			
 			results.append({
-				"resume_id": resume_emb.resume_id,
-				"final_score": round(final_score, 4),
-				"semantic_score": round(sem_score, 4),
-				"skill_score": round(skill_score, 4),
-				"experience_score": round(experience_score, 4),
-				"year_score": round(year_score, 4),
-				"reputation_score": round(reputation_score, 4),
-				"availability_score": round(availability_score, 4),
+				"resume_id": resume_id,
+				"final_score": final_score_data["final_score"],
+				"layer1_capability": capability_data,
+				"layer2_trust": trust_data,
+				"scoring_formula": final_score_data,
+				"profile": {
+					"name": profile.get("name", "Unknown"),
+					"year": profile.get("year", "Unknown"),
+					"availability": availability
+				}
 			})
 		
-		# Sort and return top-n
+		# Sort by final score
 		results.sort(key=lambda r: r["final_score"], reverse=True)
 		
 		print(f"\n{'='*60}")
@@ -197,8 +284,15 @@ def match_project(request, project_id):
 		
 		return Response({
 			"project_id": project_id,
+			"project_type": project_type,
+			"alpha": PROJECT_TYPE_ALPHA.get(project_type, 0.65),
 			"matches": results[:top_n],
-			"count": len(results[:top_n])
+			"count": len(results[:top_n]),
+			"stats": {
+				"total_resumes": total_resumes,
+				"with_embeddings": resumes_with_embeddings,
+				"passed_filter": passed_gate
+			}
 		}, status=status.HTTP_200_OK)
 		
 	except ProjectEmbedding.DoesNotExist:

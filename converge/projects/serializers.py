@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ProjectEmbedding
+from .models import ProjectEmbedding, ProjectJSON
 
 
 class ProjectEmbeddingInputSerializer(serializers.Serializer):
@@ -16,6 +16,14 @@ class ProjectEmbeddingSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = ProjectEmbedding
 		fields = ['project_id', 'semantic_text', 'embedding', 'created_at', 'updated_at']
+		read_only_fields = ['created_at', 'updated_at']
+
+
+class ProjectJSONSerializer(serializers.ModelSerializer):
+	"""Output serializer for stored project JSON"""
+	class Meta:
+		model = ProjectJSON
+		fields = ['project_id', 'project_json', 'created_at', 'updated_at']
 		read_only_fields = ['created_at', 'updated_at']
 
 #this is a model serializer for project embedidngs.

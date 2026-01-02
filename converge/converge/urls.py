@@ -16,6 +16,7 @@ urlpatterns = [
 	path("api/", core_views.api_info, name="api-info"),
 	path("api/resume/", include("resumes.urls")),
 	path("api/project/", include("projects.urls")),
+	path("api/ratings/", include("ratings.urls")),
 ]
 
 if settings.DEBUG:

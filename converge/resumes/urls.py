@@ -4,6 +4,6 @@ from . import views
 app_name = "resumes"
 
 urlpatterns = [
-	path("embed/", views.generate_resume_embedding, name="generate-embedding"),
+	path("json/", views.upsert_resume_json, name="upsert-json"),
 ]
 

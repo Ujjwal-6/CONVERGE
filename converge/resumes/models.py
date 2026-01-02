@@ -20,3 +20,23 @@ class ResumeEmbedding(models.Model):
 
 	def __str__(self):
 		return f"ResumeEmbedding(resume_id={self.resume_id})"
+
+
+class ResumeJSON(models.Model):
+	"""
+	Stores canonical resume JSON provided by the Spring Boot backend.
+	Used for downstream matching without depending on shared DB access.
+	"""
+	resume_id = models.IntegerField(unique=True, db_index=True, help_text="Foreign key to Spring Boot resume table")
+	resume_json = models.JSONField(default=dict, help_text="Canonical resume JSON payload")
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		db_table = "resume_json_store"
+		indexes = [
+			models.Index(fields=['resume_id']),
+		]
+
+	def __str__(self):
+		return f"ResumeJSON(resume_id={self.resume_id})"
