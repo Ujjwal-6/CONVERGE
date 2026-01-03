@@ -1,10 +1,10 @@
-import google.generativeai as genai
+from google.genai import Client
 from external.semantic import build_semantic_text
 
 # Configure Google Generative AI
 EMBEDDING_MODEL = "models/text-embedding-004"
-api_key = "AIzaSyBGsPwYotiRqZfQaAodEXrt7KP1xOqutR4"  # Testing only
-genai.configure(api_key=api_key)
+api_key = "AIzaSyC0nHXbPGaoimgSSx8kfFrxZl30AEwxEMU"  # Testing only
+client = Client(api_key=api_key)
 
 # ---------------- EMBEDDING FUNCTION ----------------
 def embed_semantic_text(text: str) -> list:
@@ -15,12 +15,17 @@ def embed_semantic_text(text: str) -> list:
         return [0.0] * 768
     
     try:
-        result = genai.embed_content(
+        result = client.models.embed_content(
             model=EMBEDDING_MODEL,
-            content=text,
-            task_type="RETRIEVAL_DOCUMENT"
+            contents=text,
         )
-        embedding = result['embedding']
+        # Extract embedding: result.embeddings is a list of ContentEmbedding objects
+        # Each ContentEmbedding has a 'values' attribute with the vector
+        if hasattr(result, 'embeddings') and result.embeddings:
+            embedding = list(result.embeddings[0].values)
+        else:
+            raise ValueError(f"Unexpected response structure: {result}")
+        
         print(f"[embed_resume] Generated Google embedding (dim={len(embedding)})")
         return embedding
     except Exception as e:
