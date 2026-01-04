@@ -10,4 +10,5 @@ public interface ProjectTeamRepository extends JpaRepository<ProjectTeam, Long> 
     List<ProjectTeam> findAllByProjectId(Long projectId);
     Optional<ProjectTeam> findByProjectIdAndMemberEmail(Long projectId, String memberEmail);
     boolean existsByProjectIdAndMemberEmail(Long projectId, String memberEmail);
+    List<ProjectTeam> findAllByMemberEmail(String memberEmail);
 }

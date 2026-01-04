@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.*;
 import sasvar.example.chatbot.Database.ProjectData;
 import sasvar.example.chatbot.Service.ProjectService;
 import sasvar.example.chatbot.Service.ProjectTeamService;
+import sasvar.example.chatbot.Database.ProjectTeamRequest;
+import sasvar.example.chatbot.Database.ProjectTeam;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -204,22 +206,31 @@ public class ProjectController {
         }
     }
 
-    // Add teammate to project (owner only)
+    // Send teammate request (owner initiates) — NEW behavior (previously immediately added)
+    // Accept id as String and validate to avoid MethodArgumentTypeMismatch for "undefined"
     @PostMapping("/{id}/teammates")
-    public ResponseEntity<?> addTeammate(@PathVariable("id") Long projectId,
-                                         @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> createTeammateRequest(@PathVariable("id") String projectIdStr,
+                                                   @RequestBody Map<String, String> body) {
+        Long projectId = parseId(projectIdStr);
+        if (projectId == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid project id"));
+        }
+
         try {
-            String memberEmail = body.get("email");
-            if (memberEmail == null || memberEmail.isBlank()) {
+            String targetEmail = body.get("email");
+            if (targetEmail == null || targetEmail.isBlank()) {
                 return ResponseEntity.badRequest().body(Map.of("message", "Member email required"));
             }
 
-            var saved = projectTeamService.addTeammate(projectId, memberEmail);
+            ProjectTeamRequest saved = projectTeamService.createTeammateRequest(projectId, targetEmail);
 
             Map<String, Object> resp = new HashMap<>();
+            resp.put("requestId", saved.getId());
             resp.put("projectId", saved.getProjectId());
-            resp.put("memberEmail", saved.getMemberEmail());
-            resp.put("addedAt", saved.getAddedAt());
+            resp.put("requesterEmail", saved.getRequesterEmail());
+            resp.put("targetEmail", saved.getTargetEmail());
+            resp.put("status", saved.getStatus());
+            resp.put("createdAt", saved.getCreatedAt());
             return ResponseEntity.status(HttpStatus.CREATED).body(resp);
 
         } catch (RuntimeException e) {
@@ -227,13 +238,86 @@ public class ProjectController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Failed to add teammate"));
+                    .body(Map.of("message", "Failed to create teammate request"));
+        }
+    }
+
+    // Target user accepts a teammate request
+    // Accept request id as String and validate
+    @PostMapping("/teammates/requests/{id}/accept")
+    public ResponseEntity<?> acceptTeammateRequest(@PathVariable("id") String requestIdStr) {
+        Long requestId = parseId(requestIdStr);
+        if (requestId == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid request id"));
+        }
+
+        try {
+            ProjectTeam saved = projectTeamService.acceptTeammateRequest(requestId);
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("projectId", saved.getProjectId());
+            resp.put("memberEmail", saved.getMemberEmail());
+            resp.put("addedAt", saved.getAddedAt());
+            return ResponseEntity.ok(resp);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Failed to accept request"));
+        }
+    }
+
+    // Target user rejects a teammate request
+    @PostMapping("/teammates/requests/{id}/reject")
+    public ResponseEntity<?> rejectTeammateRequest(@PathVariable("id") String requestIdStr) {
+        Long requestId = parseId(requestIdStr);
+        if (requestId == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid request id"));
+        }
+
+        try {
+            projectTeamService.rejectTeammateRequest(requestId);
+            return ResponseEntity.ok(Map.of("message", "Request rejected"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Failed to reject request"));
+        }
+    }
+
+    // List incoming teammate requests for current user
+    @GetMapping("/teammates/requests")
+    public ResponseEntity<?> listIncomingRequests() {
+        try {
+            List<ProjectTeamRequest> reqs = projectTeamService.listIncomingRequestsForCurrentUser();
+            List<Map<String, Object>> out = reqs.stream().map(r -> {
+                Map<String, Object> m = new HashMap<>();
+                m.put("requestId", r.getId());
+                m.put("projectId", r.getProjectId());
+                m.put("requesterEmail", r.getRequesterEmail());
+                m.put("targetEmail", r.getTargetEmail());
+                m.put("status", r.getStatus());
+                m.put("createdAt", r.getCreatedAt());
+                m.put("updatedAt", r.getUpdatedAt());
+                return m;
+            }).collect(Collectors.toList());
+            return ResponseEntity.ok(out);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Failed to list requests"));
         }
     }
 
     // Get single project details including stored teammates
     @GetMapping("/{id}")
-    public ResponseEntity<?> getProject(@PathVariable("id") Long projectId) {
+    public ResponseEntity<?> getProject(@PathVariable("id") String projectIdStr) {
+        Long projectId = parseId(projectIdStr);
+        if (projectId == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid project id"));
+        }
+
         try {
             ProjectData p = projectService.getProjectById(projectId);
             if (p == null) {
@@ -264,6 +348,20 @@ public class ProjectController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Failed to fetch project"));
+        }
+    }
+
+    // helper to parse path variable id strings to Long; returns null when invalid
+    private Long parseId(String idStr) {
+        if (idStr == null) return null;
+        idStr = idStr.trim();
+        if (idStr.isEmpty() || "undefined".equalsIgnoreCase(idStr) || "null".equalsIgnoreCase(idStr)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(idStr);
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 }
