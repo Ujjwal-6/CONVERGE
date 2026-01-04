@@ -24,7 +24,8 @@ public class ProjectService {
                                      String requiredSkillsCsv,
                                      String githubRepo,
                                      String description,
-                                     String domain) { // added domain param
+                                     String domain,
+                                     String preferredTechnologiesCsv) { // added param
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null) {
@@ -40,6 +41,7 @@ public class ProjectService {
         project.setGithubRepo(githubRepo);
         project.setDescription(description);
         project.setDomain(domain); // persist domain
+        project.setPreferredTechnologies(preferredTechnologiesCsv); // NEW: persist preferred techs
         project.setEmail(email);
         project.setCreatedAt(Instant.now().toString());
 
@@ -66,5 +68,11 @@ public class ProjectService {
 
     public List<ProjectData> listAllProjects() {
         return projectRepository.findAll();
+    }
+
+    // NEW: fetch a single project by id (returns null if not found)
+    public ProjectData getProjectById(Long id) {
+        if (id == null) return null;
+        return projectRepository.findById(id).orElse(null);
     }
 }

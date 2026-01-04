@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.List;
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import java.util.HashMap;
 
 @Service
 public class ChatBotService {
@@ -158,7 +159,8 @@ Resume Text:
 
         } catch (Exception e) {
             e.printStackTrace();
-            return "Error calling Gemini API";
+            // IMPORTANT: return a valid JSON fallback instead of a plain error string
+            return "{}";
         }
     }
 
@@ -182,7 +184,7 @@ Resume Text:
     }
 
 
-    // New: save parsed JSON and profile fields for a specific email (used during registration)
+    // Updated: save parsed JSON and profile fields for a specific email (used during registration and uploads)
     public JsonData saveJsonForEmail(String json,
                                     String email,
                                     String providedName,
@@ -196,11 +198,26 @@ Resume Text:
             throw new RuntimeException("Email required to save profile");
         }
 
+        // Validate incoming JSON; if invalid, replace with empty JSON object "{}"
+        String validJson = "{}";
+        if (json != null) {
+            try {
+                // attempt to parse; if succeeds, keep original string
+                new ObjectMapper().readTree(json);
+                validJson = json;
+            } catch (Exception e) {
+                e.printStackTrace();
+                // fallback to empty JSON to avoid DB jsonb insertion errors
+                validJson = "{}";
+            }
+        }
+
         JsonData profile = jsonDataRepository.findByEmail(email)
                 .orElse(new JsonData());
 
         profile.setEmail(email);
-        profile.setProfileJson(json);
+        // persist only validated JSON
+        profile.setProfileJson(validJson);
         profile.setCreatedAt(Instant.now().toString());
 
         if (providedName != null && !providedName.isBlank()) {
@@ -219,10 +236,10 @@ Resume Text:
             profile.setAvailability(providedAvailability);
         }
 
-        // For any missing fields, try to extract from parsed JSON
+        // For any missing fields, try to extract from validated parsed JSON
         try {
             ObjectMapper mapper = new ObjectMapper();
-            JsonNode root = mapper.readTree(json);
+            JsonNode root = mapper.readTree(validJson);
             JsonNode profileNode = root.path("profile");
             if (!profileNode.isMissingNode()) {
                 if ((profile.getName() == null || profile.getName().isBlank())
@@ -247,6 +264,7 @@ Resume Text:
                 }
             }
         } catch (Exception e) {
+            // already validated; this block is best-effort — ignore on failure
             e.printStackTrace();
         }
 
@@ -404,6 +422,25 @@ Resume Text:
         }
 
         // Removed: previously the owner's resume JSON was looked up and sent here.
+    }
+
+    // New helper: fetch profile by id and return top-level profile map (used by controller)
+    public Map<String, Object> getUserProfileById(Long id) {
+        if (id == null) return null;
+        Optional<JsonData> opt = jsonDataRepository.findById(id);
+        if (opt.isEmpty()) return null;
+        JsonData p = opt.get();
+
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("email", p.getEmail());
+        profile.put("name", p.getName());
+        profile.put("year", p.getYear());
+        profile.put("department", p.getDepartment());
+        profile.put("institution", p.getInstitution());
+        profile.put("availability", p.getAvailability());
+        // include parsed JSON resume under the same key used elsewhere
+        profile.put("Resume", p.getProfileJson());
+        return profile;
     }
 
 }

@@ -23,87 +23,85 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
-    private final ChatBotService chatBotService; // added
+    private final ChatBotService chatBotService;
 
-    @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody Map<String, String> body) {
-
-        String email = body.get("email");
-        String password = body.get("password");
-
-        if (email == null || password == null) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Email and password required"));
-        }
-
-        if (userRepository.findByEmail(email).isPresent()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("message", "User already exists"));
-        }
-
-        // Ensure resumeText is provided so parsed JSON is always produced & saved at registration
-        String resumeText = body.get("resumeText");
-        if (resumeText == null || resumeText.isBlank()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "resumeText is required during registration"));
-        }
-
-        User user = new User();
-        user.setEmail(email);
-        user.setPassword(passwordEncoder.encode(password));
-
-        userRepository.save(user);
-
-        JsonData savedProfile;
+    // REVERTED: single JSON register endpoint (no multipart / file handling)
+    @PostMapping(path = "/register", consumes = "application/json")
+    public ResponseEntity<?> register(@RequestBody Map<String, Object> body) {
         try {
-            // Parse resume text using existing service
-            String parsedJson = chatBotService.convertJSON(resumeText);
+            String email = (String) body.getOrDefault("email", "");
+            String password = (String) body.getOrDefault("password", "");
+            String resumeText = (String) body.getOrDefault("resumeText", body.getOrDefault("resume_text", ""));
+            String name = (String) body.getOrDefault("name", null);
+            String year = (String) body.getOrDefault("year", null);
+            String department = (String) body.getOrDefault("department", null);
+            String institution = (String) body.getOrDefault("institution", null);
+            String availability = (String) body.getOrDefault("availability", null);
 
-            // Persist parsed JSON + provided profile fields for the given email
-            savedProfile = chatBotService.saveJsonForEmail(
-                    parsedJson,
-                    email,
-                    body.get("name"),
-                    body.get("year"),
-                    body.get("department"),
-                    body.get("institution"),
-                    body.get("availability")
-            );
+            if (email == null || email.isBlank() || password == null || password.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Email and password required"));
+            }
 
-        } catch (Exception e) {
-            // Rollback user creation if parsing/saving fails
+            if (userRepository.findByEmail(email).isPresent()) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", "User already exists"));
+            }
+
+            if ((resumeText == null || resumeText.isBlank())) {
+                return ResponseEntity.badRequest().body(Map.of("message", "resumeText is required"));
+            }
+
+            User user = new User();
+            user.setEmail(email);
+            user.setPassword(passwordEncoder.encode(password));
+            userRepository.save(user);
+
+            JsonData savedProfile;
             try {
-                userRepository.delete(user);
-            } catch (Exception ignored) {}
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Failed to parse and save resume during registration"));
+                String parsedJson = "{}";
+                if (resumeText != null && !resumeText.isBlank()) {
+                    parsedJson = chatBotService.convertJSON(resumeText);
+                }
+
+                // CALL: saveJsonForEmail WITHOUT PDF args (reverted signature)
+                savedProfile = chatBotService.saveJsonForEmail(
+                        parsedJson,
+                        email,
+                        name,
+                        year,
+                        department,
+                        institution,
+                        availability
+                );
+
+            } catch (Exception e) {
+                try { userRepository.delete(user); } catch (Exception ignored) {}
+                e.printStackTrace();
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("message", "Failed to parse and save resume during registration"));
+            }
+
+            try { chatBotService.sendResumeJson(savedProfile); } catch (Exception ignored) {}
+
+            String token = jwtUtils.generateToken(user.getEmail());
+
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("message", "Registered successfully");
+            resp.put("token", token);
+            if (savedProfile != null) {
+                Map<String, Object> profile = new HashMap<>();
+                profile.put("email", savedProfile.getEmail());
+                profile.put("name", savedProfile.getName());
+                profile.put("year", savedProfile.getYear());
+                profile.put("department", savedProfile.getDepartment());
+                profile.put("institution", savedProfile.getInstitution());
+                profile.put("availability", savedProfile.getAvailability());
+                resp.put("profile", profile);
+            }
+
+            return ResponseEntity.ok(resp);
+        } catch (ClassCastException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid request payload"));
         }
-
-        // Best-effort: send parsed resume JSON to Django ML service (do not fail registration if this fails)
-        try {
-            chatBotService.sendResumeJson(savedProfile);
-        } catch (Exception ignored) {
-        }
-
-        String token = jwtUtils.generateToken(user.getEmail());
-
-        Map<String, Object> resp = new HashMap<>();
-        resp.put("message", "Registered successfully");
-        resp.put("token", token);
-        if (savedProfile != null) {
-            // Return only profile fields (exclude profileJson)
-            Map<String, Object> profile = new HashMap<>();
-            profile.put("email", savedProfile.getEmail());
-            profile.put("name", savedProfile.getName());
-            profile.put("year", savedProfile.getYear());
-            profile.put("department", savedProfile.getDepartment());
-            profile.put("institution", savedProfile.getInstitution());
-            profile.put("availability", savedProfile.getAvailability());
-            resp.put("profile", profile);
-        }
-
-        return ResponseEntity.ok(resp);
     }
 
     @PostMapping("/login")
