@@ -31,9 +31,10 @@ public class ChatBotService {
     private String apiKey;
 
     // ✅ Stable & recommended
-    private static final String GEMINI_URL =
+    private static final String GEMMA_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/" +
-                    "gemini-2.5-flash:generateContent?key=%s";
+                    "gemma-3-12b-it:generateContent?key=%s";
+
 
     public String convertJSON(String resumeText) {
 
@@ -115,7 +116,7 @@ JSON Schema:
     "completed_projects": 0,
     "average_rating": 0.0,
     "peer_endorsements": 0
-  },
+  }
 }
 
 Resume Text:
@@ -145,7 +146,7 @@ Resume Text:
         try {
             ResponseEntity<String> response =
                     restTemplate.postForEntity(
-                            String.format(GEMINI_URL, apiKey),
+                            String.format(GEMMA_URL, apiKey),
                             request,
                             String.class
                     );
