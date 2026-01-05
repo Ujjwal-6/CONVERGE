@@ -115,7 +115,7 @@ JSON Schema:
     "completed_projects": 0,
     "average_rating": 0.0,
     "peer_endorsements": 0
-  },
+  }
 }
 
 Resume Text:
