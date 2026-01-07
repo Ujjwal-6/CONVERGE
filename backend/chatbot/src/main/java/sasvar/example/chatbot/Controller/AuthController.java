@@ -32,6 +32,7 @@ public class AuthController {
             String email = (String) body.getOrDefault("email", "");
             String password = (String) body.getOrDefault("password", "");
             String resumeText = (String) body.getOrDefault("resumeText", body.getOrDefault("resume_text", ""));
+            String resumePdfBase64 = (String) body.getOrDefault("resumePdf", body.getOrDefault("resume_pdf", ""));
             String name = (String) body.getOrDefault("name", null);
             String year = (String) body.getOrDefault("year", null);
             String department = (String) body.getOrDefault("department", null);
@@ -62,7 +63,17 @@ public class AuthController {
                     parsedJson = chatBotService.convertJSON(resumeText);
                 }
 
-                // CALL: saveJsonForEmail WITHOUT PDF args (reverted signature)
+                // Decode base64 PDF to bytes
+                byte[] pdfBytes = null;
+                if (resumePdfBase64 != null && !resumePdfBase64.isBlank()) {
+                    try {
+                        pdfBytes = java.util.Base64.getDecoder().decode(resumePdfBase64);
+                    } catch (IllegalArgumentException e) {
+                        System.out.println("Invalid base64 PDF: " + e.getMessage());
+                    }
+                }
+
+                // CALL: saveJsonForEmail WITH PDF bytes only
                 savedProfile = chatBotService.saveJsonForEmail(
                         parsedJson,
                         email,
@@ -70,7 +81,8 @@ public class AuthController {
                         year,
                         department,
                         institution,
-                        availability
+                        availability,
+                        pdfBytes
                 );
 
             } catch (Exception e) {
@@ -95,6 +107,10 @@ public class AuthController {
                 profile.put("department", savedProfile.getDepartment());
                 profile.put("institution", savedProfile.getInstitution());
                 profile.put("availability", savedProfile.getAvailability());
+                // NEW: include PDF download URL instead of base64
+                if (savedProfile.getResumePdf() != null) {
+                    profile.put("resumePdfUrl", "/api/resume/download/" + savedProfile.getId());
+                }
                 resp.put("profile", profile);
             }
 
@@ -146,6 +162,10 @@ public class AuthController {
             profileMap.put("department", profile.getDepartment());
             profileMap.put("institution", profile.getInstitution());
             profileMap.put("availability", profile.getAvailability());
+            // NEW: include PDF download URL instead of base64
+            if (profile.getResumePdf() != null) {
+                profileMap.put("resumePdfUrl", "/api/resume/download/" + profile.getId());
+            }
             resp.put("profile", profileMap);
         }
 

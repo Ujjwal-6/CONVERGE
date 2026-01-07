@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
 
@@ -51,4 +52,8 @@ public class ProjectData {
 
     @Column(name = "created_at")
     private String createdAt = Instant.now().toString();
+
+    @Column(name = "status", length = 20)
+    @ColumnDefault("'ACTIVE'")
+    private String status = "ACTIVE"; // Values: "ACTIVE", "COMPLETED"
 }

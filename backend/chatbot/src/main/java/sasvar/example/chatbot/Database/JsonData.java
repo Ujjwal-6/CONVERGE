@@ -36,6 +36,11 @@ public class JsonData {
     @JsonIgnore
     private String profileJson;
 
+    // Store resume PDF as binary (BYTEA in PostgreSQL)
+    @Column(columnDefinition = "BYTEA")
+    @JsonIgnore
+    private byte[] resumePdf;
+
     @Column(nullable = false)
     private String createdAt;
 }

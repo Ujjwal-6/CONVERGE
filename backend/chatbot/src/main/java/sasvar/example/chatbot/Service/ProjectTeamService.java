@@ -108,6 +108,9 @@ public class ProjectTeamService {
         req.setStatus("PENDING");
         req.setCreatedAt(Instant.now().toString());
         req.setUpdatedAt(Instant.now().toString());
+        // NEW: Set project title and type for join requests
+        req.setProjectTitle(project.getTitle());
+        req.setType("JOIN_REQUEST");
 
         return projectTeamRequestRepository.save(req);
     }
@@ -188,6 +191,46 @@ public class ProjectTeamService {
         }
         String email = auth.getName();
         return projectTeamRequestRepository.findAllByTargetEmail(email);
+    }
+
+    // NEW: Create rating requests for all members of a completed project
+    public void createRatingRequestsForProject(ProjectData project) {
+        if (!"COMPLETED".equals(project.getStatus())) {
+            return; // Only for completed projects
+        }
+
+        List<String> memberEmails = new ArrayList<>();
+        // Add owner
+        memberEmails.add(project.getEmail());
+        // Add teammates
+        projectTeamRepository.findAllByProjectId(project.getId()).forEach(team -> memberEmails.add(team.getMemberEmail()));
+
+        // Fetch all profiles in one go to get names
+        List<JsonData> memberProfiles = memberEmails.stream()
+                .map(email -> jsonDataRepository.findByEmail(email))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toList());
+
+        for (JsonData raterProfile : memberProfiles) { // The person who will be rating
+            for (JsonData rateeProfile : memberProfiles) { // The person being rated
+                if (!raterProfile.getEmail().equals(rateeProfile.getEmail())) {
+                    ProjectTeamRequest ratingRequest = new ProjectTeamRequest();
+                    ratingRequest.setProjectId(project.getId());
+                    ratingRequest.setProjectTitle(project.getTitle());
+                    ratingRequest.setRequesterEmail("System"); // System-generated request
+                    ratingRequest.setTargetEmail(raterProfile.getEmail()); // The user who needs to perform the rating
+                    ratingRequest.setStatus("PENDING");
+                    ratingRequest.setType("RATING_REQUEST");
+                    ratingRequest.setRateeEmail(rateeProfile.getEmail()); // The user to be rated
+                    ratingRequest.setRateeName(rateeProfile.getName()); // Name of the user to be rated
+                    ratingRequest.setCreatedAt(Instant.now().toString());
+                    ratingRequest.setUpdatedAt(Instant.now().toString());
+
+                    projectTeamRequestRepository.save(ratingRequest);
+                }
+            }
+        }
     }
 
     // List teammates with basic profile fields

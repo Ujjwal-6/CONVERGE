@@ -33,7 +33,7 @@ public class ChatBotService {
     // ✅ Stable & recommended
     private static final String GEMMA_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/" +
-                    "gemma-3-12b-it:generateContent?key=%s";
+                    "gemini-2.5-flash:generateContent?key=%s";
 
 
     public String convertJSON(String resumeText) {
@@ -170,7 +170,7 @@ Resume Text:
             ObjectMapper mapper = new ObjectMapper();
             JsonNode root = mapper.readTree(responseBody);
 
-            return root
+            String text = root
                     .path("candidates")
                     .get(0)
                     .path("content")
@@ -178,6 +178,15 @@ Resume Text:
                     .get(0)
                     .path("text")
                     .asText();
+
+            // FIX: Clean markdown code blocks from Gemini response
+            if (text.startsWith("```json")) {
+                text = text.substring(7, text.length() - 3);
+            } else if (text.startsWith("```")) {
+                text = text.substring(3, text.length() - 3);
+            }
+
+            return text.trim();
 
         } catch (Exception e) {
             throw new RuntimeException("Error parsing Gemini response", e);
@@ -192,7 +201,8 @@ Resume Text:
                                     String providedYear,
                                     String providedDepartment,
                                     String providedInstitution,
-                                    String providedAvailability) {
+                                    String providedAvailability,
+                                    byte[] resumePdf) {
 
         // Use provided email (no SecurityContext required)
         if (email == null || email.isBlank()) {
@@ -219,6 +229,7 @@ Resume Text:
         profile.setEmail(email);
         // persist only validated JSON
         profile.setProfileJson(validJson);
+        profile.setResumePdf(resumePdf);
         profile.setCreatedAt(Instant.now().toString());
 
         if (providedName != null && !providedName.isBlank()) {
@@ -268,6 +279,37 @@ Resume Text:
             // already validated; this block is best-effort — ignore on failure
             e.printStackTrace();
         }
+
+        return jsonDataRepository.save(profile);
+    }
+
+    // NEW: Update only resume-related fields for an existing profile
+    public JsonData updateResumeForEmail(String json, String email, byte[] resumePdf) {
+        if (email == null || email.isBlank()) {
+            throw new RuntimeException("Email required to update profile");
+        }
+
+        JsonData profile = jsonDataRepository.findByEmail(email)
+                .orElseThrow(() -> new ProfileNotFoundException(0L)); // Throw if profile doesn't exist
+
+        // Validate incoming JSON; if invalid, replace with empty JSON object "{}"
+        String validJson = "{}";
+        if (json != null) {
+            try {
+                new ObjectMapper().readTree(json);
+                validJson = json;
+            } catch (Exception e) {
+                e.printStackTrace();
+                validJson = "{}";
+            }
+        }
+
+        // Only update resume-related fields
+        profile.setProfileJson(validJson);
+        if (resumePdf != null) {
+            profile.setResumePdf(resumePdf);
+        }
+        profile.setCreatedAt(Instant.now().toString()); // Update timestamp
 
         return jsonDataRepository.save(profile);
     }
@@ -425,6 +467,13 @@ Resume Text:
         // Removed: previously the owner's resume JSON was looked up and sent here.
     }
 
+    // New helper: fetch profile by id
+    public JsonData getProfileById(Long id) {
+        if (id == null) return null;
+        Optional<JsonData> opt = jsonDataRepository.findById(id);
+        return opt.orElse(null);
+    }
+
     // New helper: fetch profile by id and return top-level profile map (used by controller)
     public Map<String, Object> getUserProfileById(Long id) {
         if (id == null) return null;
@@ -441,7 +490,10 @@ Resume Text:
         profile.put("availability", p.getAvailability());
         // include parsed JSON resume under the same key used elsewhere
         profile.put("Resume", p.getProfileJson());
+        // NEW: include PDF download URL instead of base64
+        if (p.getResumePdf() != null) {
+            profile.put("resumePdfUrl", "/api/resume/download/" + p.getId());
+        }
         return profile;
     }
-
 }

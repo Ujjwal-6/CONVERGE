@@ -158,6 +158,7 @@ public class ProjectController {
                 m.put("description", p.getDescription());
                 m.put("domain", p.getDomain()); // include domain
                 m.put("createdAt", p.getCreatedAt());
+                m.put("status", p.getStatus()); // Include status
                 // ✅ FIX: postedBy object (matches frontend exactly)
                 Map<String, Object> postedBy = new HashMap<>();
                 postedBy.put("email", p.getEmail());
@@ -192,6 +193,7 @@ public class ProjectController {
                 m.put("description", p.getDescription());
                 m.put("domain", p.getDomain()); // include domain
                 m.put("createdAt", p.getCreatedAt());
+                m.put("status", p.getStatus()); // Include status
                 Map<String, Object> postedBy = new HashMap<>();
                 postedBy.put("email", p.getEmail());
 
@@ -294,9 +296,13 @@ public class ProjectController {
                 Map<String, Object> m = new HashMap<>();
                 m.put("requestId", r.getId());
                 m.put("projectId", r.getProjectId());
+                m.put("projectTitle", r.getProjectTitle()); // NEW
                 m.put("requesterEmail", r.getRequesterEmail());
                 m.put("targetEmail", r.getTargetEmail());
                 m.put("status", r.getStatus());
+                m.put("type", r.getType()); // NEW
+                m.put("rateeEmail", r.getRateeEmail()); // NEW
+                m.put("rateeName", r.getRateeName()); // NEW
                 m.put("createdAt", r.getCreatedAt());
                 m.put("updatedAt", r.getUpdatedAt());
                 return m;
@@ -336,6 +342,7 @@ public class ProjectController {
             m.put("domain", p.getDomain());
             m.put("createdAt", p.getCreatedAt());
             m.put("email", p.getEmail());
+            m.put("status", p.getStatus()); // Include status
 
             // include teammates
             var teammates = projectTeamService.listTeammatesForProject(projectId);
@@ -360,8 +367,11 @@ public class ProjectController {
         }
 
         try {
-            projectService.deleteProjectAsCompleted(projectId);
-            return ResponseEntity.ok(Map.of("message", "Project marked as completed and removed"));
+            ProjectData updatedProject = projectService.completeProject(projectId);
+            return ResponseEntity.ok(Map.of(
+                "message", "Project marked as completed",
+                "project", updatedProject
+            ));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
         } catch (Exception e) {

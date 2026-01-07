@@ -25,6 +25,9 @@ public class ProjectService {
     @Autowired
     private ProjectTeamRepository projectTeamRepository; // { added repository injection }
 
+    @Autowired
+    private ProjectTeamService projectTeamService;
+
     public ProjectData createProject(String title,
                                      String type,
                                      String visibility,
@@ -109,8 +112,8 @@ public class ProjectService {
         return projectRepository.findById(id).orElse(null);
     }
 
-    // NEW: delete project (owner only) — used when marking as completed
-    public void deleteProjectAsCompleted(Long projectId) {
+    // UPDATED: Mark project as completed (owner only)
+    public ProjectData completeProject(Long projectId) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null) {
             throw new RuntimeException("User not authenticated");
@@ -124,6 +127,13 @@ public class ProjectService {
             throw new RuntimeException("Only project owner can mark as completed");
         }
 
-        projectRepository.delete(project);
+        // Update status and save
+        project.setStatus("COMPLETED");
+        ProjectData updatedProject = projectRepository.save(project);
+
+        // Create rating notifications for all members
+        projectTeamService.createRatingRequestsForProject(updatedProject);
+
+        return updatedProject;
     }
 }
