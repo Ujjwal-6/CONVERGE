@@ -1,0 +1,69 @@
+# ==============================================================================
+# CONVERGE - PROJECT REQUIREMENTS & DEPENDENCIES
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. HOW TO RUN (FRONTEND)
+# ------------------------------------------------------------------------------
+# IMPORTANT: You cannot simply double-click 'index.html' to run this app.
+# Browsers block ES Module imports (import ... from ...) when using the file:// protocol.
+# You must serve the files using a local web server.
+
+# Option A: Python (Pre-installed on macOS/Linux)
+# Run this command in the project folder:
+#    python3 -m http.server 8000
+# Then open: http://localhost:8000
+
+# Option B: Node.js (If installed)
+# Run this command in the project folder:
+#    npx serve
+# Then open the URL provided (usually http://localhost:3000)
+
+# Option C: VS Code
+# Install the "Live Server" extension, right-click index.html, and choose "Open with Live Server".
+
+# ------------------------------------------------------------------------------
+# 2. SYSTEM REQUIREMENTS
+# ------------------------------------------------------------------------------
+# Backend Runtime: Java Development Kit (JDK) 17 or higher
+# Build Tool:      Maven 3.6+
+# Database:        MySQL 8.0+ (Recommended) or PostgreSQL
+# Frontend:        Modern Web Browser (Chrome, Firefox, Edge, Safari)
+
+# ------------------------------------------------------------------------------
+# 3. FRONTEND DEPENDENCIES (Client-Side)
+# ------------------------------------------------------------------------------
+# The app uses CDN links (ESM.sh and Unpkg). No 'npm install' is strictly required
+# for the provided code, but a network connection is needed to load:
+#
+# - react             @ 18.2.0
+# - react-dom         @ 18.2.0
+# - lucide-react      @ 0.263.1
+# - tailwindcss       @ 3.4.1
+# - pdf.js            @ 3.11.174
+# - babel-standalone  (For local TSX compilation)
+
+# ------------------------------------------------------------------------------
+# 4. BACKEND DEPENDENCIES (Spring Boot / Maven)
+# ------------------------------------------------------------------------------
+# Ensure your Spring Boot `pom.xml` includes:
+
+# <dependencies>
+#     <dependency>
+#         <groupId>org.springframework.boot</groupId>
+#         <artifactId>spring-boot-starter-web</artifactId>
+#     </dependency>
+#     <dependency>
+#         <groupId>org.springframework.boot</groupId>
+#         <artifactId>spring-boot-starter-data-jpa</artifactId>
+#     </dependency>
+#     <dependency>
+#         <groupId>org.springframework.boot</groupId>
+#         <artifactId>spring-boot-starter-security</artifactId>
+#     </dependency>
+#     <dependency>
+#         <groupId>com.mysql</groupId>
+#         <artifactId>mysql-connector-j</artifactId>
+#         <scope>runtime</scope>
+#     </dependency>
+# </dependencies>
