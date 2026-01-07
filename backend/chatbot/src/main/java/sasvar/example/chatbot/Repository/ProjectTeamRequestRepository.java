@@ -7,8 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ProjectTeamRequestRepository extends JpaRepository<ProjectTeamRequest, Long> {
+    List<ProjectTeamRequest> findByTargetEmailAndStatus(String targetEmail, String status);
     List<ProjectTeamRequest> findAllByTargetEmail(String targetEmail);
-    List<ProjectTeamRequest> findAllByRequesterEmail(String requesterEmail);
     Optional<ProjectTeamRequest> findByProjectIdAndTargetEmailAndStatus(Long projectId, String targetEmail, String status);
 }
-
